@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "点词即查",
-  "version": "1.3.2",
+  "version": "1.3.6",
   "description": "阅读英文网页时，点击单词查看音标、发音和中文释义。",
   "icons": {
     "16": "icon.png",

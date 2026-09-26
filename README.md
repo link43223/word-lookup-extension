@@ -1,12 +1,12 @@
 # 点词即查 / Click to Look Up
 
-一个独立、开源的 Chrome 扩展。阅读英文网页时点击普通文本中的单词，可在底部查看音标、发音和中文释义。无需注册账号、安装依赖或运行 Aperture、本地服务器及阿里云服务。
+一个独立、开源的 Chrome 扩展。阅读英文网页时点击普通文本中的单词，可查看音标、发音和中文释义。释义框始终靠近被点单词显示；电脑浏览器窗口收窄时自动缩小卡片，不切换成底部弹窗。无需注册账号、安装依赖或运行 Aperture、本地服务器及阿里云服务。
 
-An open-source Chrome extension for looking up English words by clicking them on a webpage. It shows pronunciation, phonetics and Chinese definitions in a bottom sheet. No account, build step or self-hosted server is needed.
+An open-source Chrome extension for looking up English words by clicking them on a webpage. It shows pronunciation, phonetics and Chinese definitions in a popover near the selected word. No account, build step or self-hosted server is needed.
 
-查词和发音需要联网，会直接请求有道词典。此项目与 Aperture 是两个独立项目；本扩展不提供收藏或整句翻译。
+首次查词和发音需要联网，会直接请求有道词典；同一页面重复查询已查过的词时，可直接使用本页缓存。此项目与 Aperture 是两个独立项目；本扩展不提供收藏或整句翻译。
 
-连字符词优先查询整词；整词未收录时会分别显示组成词的释义，并明确提示这不等于整词翻译。未点击时保持原文颜色和网页原有光标，不添加蓝色底纹；点击后，被查的词改为与释义面板标题相同的金色圆角高亮，并一直保持到关闭面板。扩展面板使用暖白和深灰；面板根据被点击文字所在区域的底色切换明暗，不跟随电脑系统主题。圆角标记只画在扩展自己的浮层上，按被点击单词的实际位置摆放；不会包裹或改写原文文字节点，也不影响周围单词的排版。遇到跨行等不适合叠加圆角标记的情况，会退回原有的文字高亮。点击浏览器工具栏中的扩展图标，可查看简短使用提示。
+连字符词优先查询整词；整词未收录时会分别显示组成词的释义，并明确提示这不等于整词翻译。未点击时保持原文颜色和网页原有光标，不添加蓝色底纹；点击后，被查的词改为与释义面板标题相同的金色圆角高亮。释义完整返回后才显示卡片，不逐字播放，也不先弹空卡片；超过一秒时才在单词旁显示简短查询提示。等待期间或卡片出现后，再次点击网页任意位置（包括原单词或别的单词）只会关闭释义并清除高亮；再点一次才查新词。扩展面板使用暖白和深灰；面板根据被点击文字所在区域的底色切换明暗，不跟随电脑系统主题。释义框根据单词位置在邻近留白、上方或下方显示，窄窗口下自动收窄，以短距离淡入出现且不会将整页压暗；内容过长时可在框内滚动，释义不会删减或折叠。圆角标记只画在扩展自己的浮层上，按被点击单词的实际位置摆放；不会包裹或改写原文文字节点，也不影响周围单词的排版。遇到跨行等不适合叠加圆角标记的情况，会退回原有的文字高亮。点击浏览器工具栏中的扩展图标，可查看简短使用提示。
 
 对于 `Jooste's` 这样的所有格，扩展先查完整形式，再查去掉 `'s` 的原词。若原词也不在词典中，会解释 `'s` 的含义，不把相似拼写的其他名字冒充释义。词典未收录和网络失败会分别提示。
 
@@ -31,6 +31,8 @@ An open-source Chrome extension for looking up English words by clicking them on
 
 查询依赖第三方词典服务；服务不可用或返回格式发生变化时，释义可能无法加载。此仓库不包含有道词典的数据，也不代表有道官方产品。
 
+成功查到的释义会先交给卡片显示，再异步写入浏览器缓存；缓存写入失败不会掩盖已经取得的释义。后台和当前网页也会暂存少量成功结果，加快重复查询。卡片动画时长、释义顺序与文本不因此改变。
+
 ## 开发
 
 无需构建步骤。安装 Node.js 后可在此目录运行 `node --test *.test.js` 检查查词和显示逻辑。修改文件后在 `chrome://extensions` 重新加载扩展，并刷新测试网页。
@@ -39,7 +41,7 @@ An open-source Chrome extension for looking up English words by clicking them on
 
 - `manifest.json`：Chrome 扩展配置及权限。
 - `popup.html`：浏览器工具栏中的简短使用提示。
-- `content.js`：查词交互、临时高亮和底部释义面板。
+- `content.js`：查词交互、临时高亮和靠近单词的释义卡片。
 - `service-worker.js`：直接向有道词典查询释义，并缓存成功的结果。
 - `icon.svg` / `icon.png`：扩展自己的图标。
 - `lookup.test.js` / `meaning-render.test.js`：查词与释义显示的回归测试，可运行 `node --test *.test.js`。

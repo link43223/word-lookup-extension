@@ -97,3 +97,54 @@ test("unknown formatting stays visible rather than being silently discarded", ()
   const source = dictionary({});
   assert.deepEqual(source.parse(["【短语】a special phrase"]), [{ pos: "", text: "【短语】a special phrase" }]);
 });
+
+test("a ready answer is returned before the disk-cache write finishes", async () => {
+  let finishWrite;
+  const write = new Promise(resolve => { finishWrite = resolve; });
+  let reads = 0;
+  let requests = 0;
+  const context = vm.createContext({
+    chrome: {
+      runtime: { onMessage: { addListener() {} } },
+      storage: { local: {
+        async get() { reads++; return {}; },
+        set() { return write; }
+      } }
+    },
+    AbortController, setTimeout, clearTimeout,
+    fetch: async () => {
+      requests++;
+      return { ok: true, json: async () => ({ ec: { word: [{ headword: "reserve", trs: [{ tr: [{ l: { i: ["v. 保留"] } }] }] }] } }) };
+    }
+  });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "service-worker.js"), "utf8"), context);
+  const lookup = vm.runInContext("lookup", context);
+  try {
+    const result = await Promise.race([
+      lookup("reserve"),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("lookup waited for cache write")), 200))
+    ]);
+    assert.equal(result.meanings[0].text, "保留");
+    const repeated = await lookup("reserve");
+    assert.equal(repeated, result);
+    assert.equal(reads, 1);
+    assert.equal(requests, 1);
+  } finally { finishWrite(); }
+});
+
+test("cache read and write failures do not hide a successful definition", async () => {
+  const context = vm.createContext({
+    chrome: {
+      runtime: { onMessage: { addListener() {} } },
+      storage: { local: {
+        async get() { throw new Error("storage read failed"); },
+        async set() { throw new Error("storage write failed"); }
+      } }
+    },
+    AbortController, setTimeout, clearTimeout,
+    fetch: async () => ({ ok: true, json: async () => ({ ec: { word: [{ headword: "reserve", trs: [{ tr: [{ l: { i: ["v. 保留"] } }] }] }] } }) })
+  });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "service-worker.js"), "utf8"), context);
+  const result = await vm.runInContext("lookup('reserve')", context);
+  assert.equal(result.meanings[0].text, "保留");
+});

@@ -2,7 +2,9 @@
 
 const CACHE_PREFIX = "word:v6:";
 const CACHE_AGE = 30 * 24 * 60 * 60 * 1000;
+const HOT_CACHE_LIMIT = 128;
 const inflight = new Map();
+const hotCache = new Map();
 
 class NoEntryError extends Error {
   constructor(message) { super(message); this.name = "NoEntryError"; }
@@ -24,16 +26,41 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true;
 });
 
-async function lookup(word, surface = word) {
+function readHotCache(key) {
+  const saved = hotCache.get(key);
+  if (!saved) return null;
+  if (Date.now() - saved.at >= CACHE_AGE) { hotCache.delete(key); return null; }
+  hotCache.delete(key);
+  hotCache.set(key, saved);
+  return saved.data;
+}
+
+function rememberHotCache(key, saved) {
+  hotCache.delete(key);
+  hotCache.set(key, saved);
+  if (hotCache.size > HOT_CACHE_LIMIT) hotCache.delete(hotCache.keys().next().value);
+}
+
+function lookup(word, surface = word) {
   const key = CACHE_PREFIX + word + (word.endsWith("'s") ? ":" + surface : "");
-  const saved = (await chrome.storage.local.get(key))[key];
-  if (saved && Date.now() - saved.at < CACHE_AGE && saved.data) return saved.data;
+  const hot = readHotCache(key);
+  if (hot) return Promise.resolve(hot);
   if (inflight.has(key)) return inflight.get(key);
-  const task = lookupOnline(word, surface).then(async data => {
+  const task = (async () => {
+    let saved;
+    try { saved = (await chrome.storage.local.get(key))[key]; } catch (_) { /* Cache failure must not block lookup. */ }
+    if (saved && Date.now() - saved.at < CACHE_AGE && saved.data) {
+      rememberHotCache(key, saved);
+      return saved.data;
+    }
+    const data = await lookupOnline(word, surface);
     data.meanings = parseMeanings(data.lines || []);
-    await chrome.storage.local.set({ [key]: { at: Date.now(), data } });
+    const entry = { at: Date.now(), data };
+    rememberHotCache(key, entry);
+    // The answer is ready; writing the next visit's cache must not delay this one.
+    try { void chrome.storage.local.set({ [key]: entry }).catch(() => {}); } catch (_) { /* Best-effort cache. */ }
     return data;
-  }).finally(() => inflight.delete(key));
+  })().finally(() => inflight.delete(key));
   inflight.set(key, task);
   return task;
 }
