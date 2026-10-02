@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>隐私政策 · 点词即查</title>
+<style>
+:root{color-scheme:light dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;background:#fcfbf8;color:#343432}*{box-sizing:border-box}body{margin:0;padding:64px 24px}main{max-width:740px;margin:auto}a{color:#80621f;text-underline-offset:4px}header{padding-bottom:32px;border-bottom:1px solid #e7e2d5}.brand{font-size:14px;color:#80621f}h1{font-size:38px;letter-spacing:-.03em;margin:14px 0}h2{font-size:20px;margin:32px 0 12px}p,li{font-size:15px;line-height:1.9}p{margin:12px 0}.date{font-size:13px;color:#77736b}.summary{margin:26px 0;padding:20px 24px;background:#f0eadd;border-radius:14px}footer{margin-top:40px;border-top:1px solid #e7e2d5;padding-top:24px;font-size:13px;color:#77736b}@media(prefers-color-scheme:dark){:root{background:#242422;color:#e2dfd7}a,.brand{color:#dfbe73}.date,footer{color:#b8b5ad}.summary{background:#353126}header,footer{border-color:#444137}}@media(max-width:480px){body{padding:32px 20px}h1{font-size:30px}}
+</style>
+</head>
+<body><main>
+<header><div class="brand">点词即查 · Click to Look Up</div><h1>隐私政策</h1><p class="date">生效日期：2026 年 10 月 2 日 · 适用版本：1.4.6 及后续保持相同行为的版本</p></header>
+<div class="summary">点词即查用于在英文网页上点击查词。个人释义词库从空开始，用户成功查到的词逐步保存在本机。扩展不需要注册用户账号，没有广告、分析追踪代码或开发者运营的数据服务器。</div>
+<h2>1. 网页内容与查询</h2>
+<p>扩展在普通 HTTP/HTTPS 网页中识别用户点击的文本，在单词旁显示释义。识别所需的文本节点、位置和背景颜色在本机处理。扩展不主动上传整篇文章、整句内容、网页标题、网页地址或浏览历史，也不自动批量收集页面中的词汇。鼠标经过正文只唤醒本地后台，不发送查词请求。</p>
+<p>当本地没有可用释义、需要重试未收录词条，或本地读取失败而转为在线查询时，扩展通过 HTTPS 将该单词发送至 <strong>dict.youdao.com</strong> 获取释义；所有格形式可能继续查询去掉所有格后缀的原词。点击发音按钮时，同样向有道发送待发音单词并播放在线音频。播放音频需要联网。</p>
+<h2>2. 第三方服务</h2>
+<p>在线释义与音频由有道提供。第三方服务器会收到正常网络连接所需的信息，例如 IP 地址和请求参数，并可能按照其自身政策记录请求。浏览器可能根据自己的网络和 Cookie 设置附带请求信息。本政策说明扩展自身的处理方式，不能替第三方承诺其日志保存期限。使用在线查询或发音前，可通过有道官网了解其隐私政策。</p>
+<p>扩展未将这些查询传给开发者的服务器。开发者不会通过扩展接收或查看用户的查询记录、文章或个人词库。</p>
+<h2>3. 保存在本机的数据</h2>
+<p>成功查询的单词、音标、完整释义及显示所需字段保存在扩展专属的 Chrome 本地存储中，供再次查词使用。另有少量查询时间、未收录标记、待保存会话日志和保存状态用于运行与重试。个人词库不使用 Chrome Sync 自动跨设备同步。新安装不附带开发者个人查询记录或预置释义库。</p>
+<p>文件备份需要用户自行选择并授权文件。扩展在浏览器的 IndexedDB 中保存已授权文件的句柄，并保存备份状态、文件名和成功时间，用于后续更新同一个备份文件。扩展不获得对整个磁盘的任意访问权限。</p>
+<h2>4. 文件备份与恢复</h2>
+<p>用户启用自动备份或下载独立副本后，词条以 JSON 文件保存到用户选择的位置。备份没有额外加密，能够直接阅读，可能反映用户查过的词。如果该位置由网盘或其他软件同步，文件会按照该软件的设置处理；这不是扩展主动上传。</p>
+<p>恢复时，用户选择的备份在本机读取和验证。有效词条补充到本地词库，已有真实词条优先保留。卸载后，用户需要重新安装并主动恢复备份；自动备份文件需要重新连接并授权。</p>
+<h2>5. 数据保存与删除</h2>
+<p>成功保存的词条保留至用户清除扩展数据或卸载扩展；正常更新同一扩展不会主动清空词库。未收录标记约 15 分钟后失效，会话日志不跨浏览器完全退出。磁盘写入或备份失败会提示并重试，但尚未保存成功的数据在强制退出或断电时可能丢失。</p>
+<p>如需删除全部扩展内部数据，可以卸载本扩展。卸载不会删除已下载或授权保存到电脑的 JSON 备份文件；这些副本及其他软件同步的副本须由用户自行删除。</p>
+<h2>6. 数据使用承诺</h2>
+<p>扩展处理的信息仅用于用户触发的查词、发音、本地保存、备份与恢复。开发者不出售这些信息，不用于广告、用户画像、信用评估或其他无关用途。点词即查对用户数据的使用遵守 Chrome Web Store 用户数据政策，包括 Limited Use（有限使用）要求。</p>
+<h2>7. 权限用途</h2>
+<p>网页访问用于识别点击与显示释义；有道域名访问用于在线查词和发音；storage 用于词库与设置；unlimitedStorage 用于不断增长的个人词库；alarms 用于后台保存和备份重试。文件访问另由浏览器在用户选择文件时请求授权。</p>
+<h2>8. 政策更新与联系</h2>
+<p>如果处理方式改变，我们会相应更新本政策及商店披露。用户可以通过 <a href="https://github.com/link43223/word-lookup-extension/issues" target="_blank" rel="noopener">项目问题反馈页面</a> 联系维护者。反馈页面是公开的，请不要发布私密文章、完整个人词库、账号凭证或其他敏感信息。</p>
+<footer>维护者：项目维护团队（GitHub：link43223）。本扩展通过第三方词典服务提供查询功能；商店介绍中的功能说明以实际安装版本为准。</footer>
+</main></body></html>
