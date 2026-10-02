@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>词库与备份 · 点词即查</title>
+  <style>
+    :root{color-scheme:light dark;font-family:system-ui,"Microsoft YaHei",sans-serif;background:#f6f5f1;color:#272720}
+    *{box-sizing:border-box}body{margin:0;padding:48px 24px}main{max-width:760px;margin:auto}
+    .eyebrow{color:#80621f;font-size:13px}h1{font-size:30px;margin:10px 0 16px}h2{font-size:19px;margin:0 0 12px}
+    p{line-height:1.8;margin:8px 0;color:#58584f}section{margin-top:24px;background:#fffefb;border:1px solid #e2dfd4;border-radius:16px;padding:24px}
+    .count{font-size:36px;font-weight:700;color:#80621f}.muted{font-size:13px;color:#707064}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+    button{border:1px solid #a28c53;background:#fffdf6;color:#6f5315;border-radius:9px;padding:10px 16px;font:inherit;font-size:14px;cursor:pointer}
+    button.primary{background:#80621f;color:white;border-color:#80621f}button:hover{filter:brightness(.96)}button:disabled{opacity:.5;cursor:default}
+    button:focus-visible{outline:3px solid #bba35e;outline-offset:3px}
+    #message{min-height:28px;white-space:pre-wrap;overflow-wrap:anywhere}#message.error{color:#b42318}
+    #file-details{overflow-wrap:anywhere}input[hidden]{display:none}
+    @media(prefers-color-scheme:dark){:root{background:#20211f;color:#eeeae0}section{background:#292a27;border-color:#484940}p,.muted{color:#c5c3b9}.count,.eyebrow{color:#d7bc77}button{background:#32332e;color:#e2ca92}#message.error{color:#ffaaa2}}
+    @media(max-width:480px){body{padding:24px 14px}section{padding:18px}.actions button{flex:1}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">点词即查</div>
+  <h1>词库与备份</h1>
+  <p>查过的词留在本机，再次点击优先本地读取。关闭浏览器、更新同一个扩展，不会清空词库。</p>
+  <section aria-labelledby="library-title">
+    <h2 id="library-title">已保存的词条</h2>
+    <span class="count" id="library-count">—</span>
+    <p class="muted">这是去重后的词条数，不是点击次数。释义和音标一起保存，播放音频仍需联网。</p>
+  </section>
+  <section aria-labelledby="backup-title">
+    <h2 id="backup-title">电脑上的自动备份</h2>
+    <p id="backup-status" role="status">正在读取…</p>
+    <p id="file-details" class="muted"></p>
+    <p class="muted">选择电脑上的 JSON 文件后，新增词条会自动写入；失败会显示原因并重试。重启后若浏览器要求授权，请回来点击“重新授权”。</p>
+    <div class="actions">
+      <button class="primary" id="choose-backup" type="button">选择自动备份文件</button>
+      <button id="backup-now" type="button" disabled>立即备份</button>
+      <button id="reauthorize" type="button" hidden disabled>重新授权</button>
+    </div>
+  </section>
+  <section aria-labelledby="restore-title">
+    <h2 id="restore-title">恢复与额外副本</h2>
+    <p>卸载会清除扩展内部词库，但不会删除已经写到电脑的备份。重新安装后选择备份文件恢复，再连接自动备份文件。</p>
+    <p class="muted">恢复只补充本地缺少的词条，不覆盖已有释义。选择已有文件作自动备份时，也会先合并其中的词条。</p>
+    <div class="actions">
+      <button id="restore-backup" type="button">恢复备份</button>
+      <button id="export-backup" type="button">下载独立副本</button>
+    </div>
+    <input id="restore-file" type="file" accept="application/json,.json" hidden>
+  </section>
+  <p id="message" role="status" aria-live="polite"></p>
+</main>
+<script src="library-ui.js"></script>
+<script src="library-page.js"></script>
+</body>
+</html>

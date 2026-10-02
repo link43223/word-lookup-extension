@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "点词即查",
-  "version": "1.3.6",
+  "version": "1.4.2",
   "description": "阅读英文网页时，点击单词查看音标、发音和中文释义。",
   "icons": {
     "16": "icon.png",
@@ -12,7 +12,11 @@
     "default_title": "点词即查：点击英文单词查看释义",
     "default_popup": "popup.html"
   },
-  "permissions": ["storage"],
+  "permissions": ["storage", "unlimitedStorage", "alarms"],
+  "options_ui": {
+    "page": "library.html",
+    "open_in_tab": true
+  },
   "host_permissions": ["https://dict.youdao.com/*"],
   "background": {
     "service_worker": "service-worker.js"

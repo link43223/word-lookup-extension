@@ -12,9 +12,10 @@
       *,*::before,*::after{box-sizing:border-box}
       .selected-chip{position:fixed;display:block;overflow:hidden;white-space:pre;pointer-events:none;background:#80621f;color:#fff;border-radius:4px;text-align:left}
       .lookup-pending{position:fixed;pointer-events:none;padding:3px 7px;border-radius:6px;background:#f8f7f3;color:#80621f;box-shadow:0 2px 10px rgba(0,0,0,.14);font:12px/1.4 Arial,"Microsoft YaHei",sans-serif;white-space:nowrap}
-      .sheet{position:fixed;left:0;top:0;width:min(420px,calc(100vw - 32px));max-height:calc(100svh - 32px);overflow:auto;padding:18px 20px 20px;background:#f8f7f3;color:#242424;border-radius:16px;box-shadow:0 -4px 24px rgba(0,0,0,.12);font-family:Arial,"Microsoft YaHei",sans-serif;pointer-events:auto;opacity:0;transform:translate3d(var(--enter-x,0px),var(--enter-y,5px),0);visibility:hidden;transition:opacity .13s ease-in,transform .13s ease-in,visibility 0s .13s}
-      .sheet.open{opacity:1;transform:translate3d(0,0,0);visibility:visible;transition:opacity .18s ease-out,transform .18s cubic-bezier(.2,.8,.2,1),visibility 0s}
-      .head{display:flex;align-items:center;flex-wrap:wrap;gap:5px;min-height:32px;margin-bottom:10px}
+      .sheet{position:fixed;left:0;top:0;width:min(420px,calc(100vw - 32px));max-height:calc(100svh - 32px);overflow:auto;padding:18px 20px 20px;background:#f8f7f3;color:#242424;border-radius:16px;box-shadow:0 -4px 24px rgba(0,0,0,.12);font-family:Arial,"Microsoft YaHei",sans-serif;pointer-events:auto;opacity:0;transform:translate3d(var(--enter-x,0px),var(--enter-y,5px),0);visibility:hidden;transition:opacity .1s ease-in,transform .1s ease-in,visibility 0s .1s}
+      .sheet.open{opacity:1;transform:translate3d(0,0,0);visibility:visible;transition:opacity .13s ease-out,transform .13s cubic-bezier(.2,.8,.2,1),visibility 0s}
+      .head{display:flex;align-items:flex-start;gap:5px;min-height:32px;margin-bottom:10px}
+      .head-main{display:flex;align-items:center;flex:1;min-width:0;flex-wrap:wrap;gap:5px}
       .word{font-size:22px;line-height:1.3;font-weight:700;color:#80621f;overflow-wrap:anywhere}
       .phonetic{font-size:13px;color:#6b7280;overflow-wrap:anywhere}
       button{appearance:none;border:0;background:transparent;cursor:pointer}
@@ -40,8 +41,8 @@
       @media(prefers-reduced-motion:reduce){.sheet,.sheet.open{transition:none}}
     </style>
     <section class="sheet" role="dialog" aria-label="单词释义">
-      <div class="head"><span class="word"></span><span class="phonetic"></span>
-        <button class="speaker" type="button" aria-label="播放发音"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19 11,5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg></button>
+      <div class="head"><div class="head-main"><span class="word"></span><span class="phonetic"></span>
+        <button class="speaker" type="button" aria-label="播放发音"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19 11,5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg></button></div>
         <button class="close" type="button" aria-label="关闭">×</button>
       </div>
       <div class="meanings"></div>
@@ -69,9 +70,22 @@
   let lookupPending = false;
   let pendingTimer = 0;
   let pendingIndicator = null;
+  let warmupRequested = false;
   const recentLookups = new Map();
-  const recentLookupAge = 30 * 24 * 60 * 60 * 1000;
+  const pendingDelay = 400;
   const recentLookupLimit = 128;
+
+  chrome.storage?.onChanged.addListener((changes, area) => {
+    if (area !== "local") return;
+    if (changes["library-meta:restored"]) {
+      recentLookups.clear();
+      close();
+      return;
+    }
+    for (const key of Object.keys(changes)) {
+      if (key.startsWith("library:v1:")) recentLookups.delete(key.slice("library:v1:".length));
+    }
+  });
   try {
     selectedStyle = new CSSStyleSheet();
     selectedStyle.replaceSync("::highlight(word-lookup-selected){background-color:#80621f;color:#fff}");
@@ -104,7 +118,7 @@
     setSpeakerState("idle");
   }
 
-  function show(word, context = "") {
+  function show(word) {
     requestId++;
     const current = requestId;
     lookupPending = true;
@@ -118,11 +132,9 @@
     const cached = recentLookups.get(cacheKey);
     if (cached) {
       recentLookups.delete(cacheKey);
-      if (Date.now() - cached.at < recentLookupAge) {
-        recentLookups.set(cacheKey, cached);
-        showResponse({ ok: true, data: cached.data }, word, context, current);
-        return;
-      }
+      recentLookups.set(cacheKey, cached);
+      showResponse({ ok: true, data: cached.data }, word, current);
+      return;
     }
     pendingTimer = setTimeout(() => {
       if (current !== requestId || !lookupPending || !selectedHit) return;
@@ -131,13 +143,18 @@
       pendingIndicator.textContent = "查询中…";
       shadow.insertBefore(pendingIndicator, sheet);
       positionPendingIndicator();
-    }, 1000);
-    chrome.runtime.sendMessage({ type: "lookup", word: activeWord, surface: word }, response => {
-      showResponse(chrome.runtime.lastError ? null : response, word, context, current, cacheKey);
-    });
+    }, pendingDelay);
+    try {
+      chrome.runtime.sendMessage({ type: "lookup", word: activeWord, surface: word }, response => {
+        showResponse(chrome.runtime.lastError ? { ok: false, error: "连接已中断，请刷新网页后重试" } : response,
+          word, current, cacheKey);
+      });
+    } catch (_) {
+      showResponse({ ok: false, error: "插件已更新，请刷新网页后重试" }, word, current);
+    }
   }
 
-  function showResponse(response, word, context, current, cacheKey = "") {
+  function showResponse(response, word, current, cacheKey = "") {
     if (current !== requestId) return;
     lookupPending = false;
     clearPendingIndicator();
@@ -153,7 +170,7 @@
     const data = response.data;
     if (cacheKey) {
       recentLookups.delete(cacheKey);
-      recentLookups.set(cacheKey, { at: Date.now(), data });
+      recentLookups.set(cacheKey, { data });
       if (recentLookups.size > recentLookupLimit) recentLookups.delete(recentLookups.keys().next().value);
     }
     if (data.note) {
@@ -163,10 +180,18 @@
       meaningsEl.append(note);
     }
     const headword = typeof data.headword === "string" && /^[a-z]+(?:['-][a-z]+)*$/i.test(data.headword) ? data.headword : word;
-    wordEl.textContent = headword;
-    const phonetic = typeof data.us === "string" && data.us ? data.us : typeof data.uk === "string" ? data.uk : "";
-    phoneticEl.textContent = phonetic ? "/" + phonetic.replace(/^\/+|\/+$/g, "") + "/" : "";
-    renderMeanings(data.meanings || parseMeaningLines(data.lines || []), context, activeWord);
+    const exactNameEntry = /^[A-Z][a-z]{1,39}$/.test(word) && headword.toLowerCase() === word.toLowerCase() &&
+      (data.meanings || parseMeaningLines(data.lines || [])).some(entry => /人名|姓氏/.test(entry.text || ""));
+    wordEl.textContent = exactNameEntry ? word : headword;
+    const phonetic = typeof data.us === "string" && data.us ? data.us
+      : typeof data.uk === "string" && data.uk ? data.uk : typeof data.phone === "string" ? data.phone : "";
+    const parts = Array.isArray(data.componentPhones) ? data.componentPhones : [];
+    const variants = Array.isArray(data.ipaVariants) ? data.ipaVariants.filter(part => typeof part === "string" && part) : [];
+    phoneticEl.textContent = phonetic ? "/" + phonetic.replace(/^\/+|\/+$/g, "") + "/"
+      : variants.length ? variants.map(part => "/" + part.replace(/^\/+|\/+$/g, "") + "/").join(" · ")
+      : parts.length && parts.every(part => typeof part.word === "string" && typeof part.phone === "string" && part.phone)
+        ? "组成词音标：" + parts.map(part => part.word + " /" + part.phone.replace(/^\/+|\/+$/g, "") + "/").join(" · ") : "";
+    renderMeanings(data.meanings || parseMeaningLines(data.lines || []));
     if (!meaningsEl.childNodes.length) meaningsEl.textContent = "暂时无法获取释义";
     open();
   }
@@ -186,18 +211,16 @@
     pendingIndicator.style.top = Math.round(Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 28))) + "px";
   }
 
-  function renderMeanings(entries, context, word) {
-    const groups = new Map();
+  function renderMeanings(entries) {
+    const groups = [];
     for (const entry of entries) {
       if (!entry || typeof entry.text !== "string" || !entry.text.trim()) continue;
       const pos = normalizePos(entry.pos);
-      if (!groups.has(pos)) groups.set(pos, []);
-      groups.get(pos).push(entry);
+      const last = groups[groups.length - 1];
+      if (last && last[0] === pos) last[1].push(entry);
+      else groups.push([pos, [entry]]);
     }
-    const likely = inferLikelyPos(context, word, Array.from(groups.keys()));
-    const ordered = Array.from(groups.entries());
-    if (likely) ordered.sort(([left], [right]) => left === likely ? -1 : right === likely ? 1 : 0);
-    for (const [pos, items] of ordered) {
+    for (const [pos, items] of groups) {
       const group = document.createElement("div");
       group.className = "sense-group";
       if (pos) {
@@ -237,6 +260,8 @@
         if (line) result.push({ pos: "", text: line });
         continue;
       }
+      const prefix = line.slice(0, found[0].index).trim();
+      if (prefix) result.push({ pos: "", text: prefix });
       found.forEach((match, index) => {
         const start = match.index + match[0].length;
         const end = index + 1 < found.length ? found[index + 1].index : line.length;
@@ -245,40 +270,6 @@
       });
     }
     return result;
-  }
-
-  function inferLikelyPos(context, word, available) {
-    if (!context || !available.length) return "";
-    const tokens = Array.from(context.matchAll(/[A-Za-z]+(?:['’-][A-Za-z]+)*/g), match => ({ text: match[0], lower: match[0].toLowerCase() }));
-    const target = tokens.findIndex(token => token.lower.replace(/[’]/g, "'") === word.toLowerCase());
-    if (target < 0) return "";
-    const before = tokens[target - 1]?.lower || "";
-    const after = tokens[target + 1]?.text || "";
-    const afterLower = after.toLowerCase();
-    const has = pos => available.includes(pos);
-    const auxiliaries = new Set(["to", "can", "could", "may", "might", "must", "shall", "should", "will", "would", "do", "does", "did"]);
-    const pronouns = new Set(["i", "you", "we", "they", "he", "she", "it"]);
-    const determiners = new Set(["a", "an", "the", "this", "that", "these", "those", "my", "your", "his", "her", "its", "our", "their"]);
-    const prepositions = new Set(["about", "above", "across", "after", "against", "along", "among", "around", "at", "before", "behind", "below", "beneath", "beside", "between", "beyond", "by", "despite", "down", "during", "for", "from", "in", "inside", "into", "near", "of", "off", "on", "onto", "out", "outside", "over", "past", "through", "throughout", "to", "toward", "under", "underneath", "until", "upon", "with", "within", "without"]);
-    if (has("prep") && prepositions.has(word.toLowerCase()) && (determiners.has(afterLower) || pronouns.has(afterLower) || (after && /^[A-Z]/.test(after) && target > 0))) return "prep";
-    if (has("v") && (auxiliaries.has(before) || pronouns.has(before))) return "v";
-    const copulas = new Set(["am", "is", "are", "was", "were", "be", "been", "being", "seem", "seems", "seemed", "remain", "remains", "remained"]);
-    if (has("n") && determiners.has(before) && (!after || copulas.has(afterLower))) return "n";
-    if (has("adj") && target + 2 < tokens.length && (determiners.has(before) || pronouns.has(before)) && !copulas.has(afterLower)) return "adj";
-    return "";
-  }
-
-  function sentenceContext(hit) {
-    const text = hit.node.textContent || "";
-    const lowerBound = Math.max(0, hit.start - 240);
-    const upperBound = Math.min(text.length, hit.end + 240);
-    const sample = text.slice(lowerBound, upperBound);
-    const targetStart = hit.start - lowerBound;
-    const targetEnd = hit.end - lowerBound;
-    const left = Math.max(sample.lastIndexOf(".", targetStart), sample.lastIndexOf("?", targetStart), sample.lastIndexOf("!", targetStart), sample.lastIndexOf(";", targetStart)) + 1;
-    const endings = [sample.indexOf(".", targetEnd), sample.indexOf("?", targetEnd), sample.indexOf("!", targetEnd), sample.indexOf(";", targetEnd)].filter(index => index >= 0);
-    const right = endings.length ? Math.min(...endings) : sample.length;
-    return sample.slice(left, right).trim();
   }
 
   function open() {
@@ -343,17 +334,69 @@
     const node = caret ? caret.offsetNode : range && range.startContainer;
     if (!node || node.nodeType !== Node.TEXT_NODE || !node.textContent) return null;
     const text = node.textContent;
-    const matches = text.matchAll(/[A-Za-z]+(?:['’][A-Za-z]+)*(?:[-‐‑‒–—][A-Za-z]+(?:['’][A-Za-z]+)*)*/g);
-    for (const match of matches) {
-      const rectRange = document.createRange();
-      rectRange.setStart(node, match.index);
-      rectRange.setEnd(node, match.index + match[0].length);
-      const anchorIndex = Array.from(rectRange.getClientRects()).findIndex(rect =>
-        x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
-      );
-      if (anchorIndex >= 0) return { word: match[0].replace(/’/g, "'").replace(/[‐‑‒–—]/g, "-"), range: rectRange, node, start: match.index, end: match.index + match[0].length, anchorIndex };
+    const offset = caret ? caret.offset : range && range.startOffset;
+    const hasOffset = Number.isInteger(offset) && offset >= 0 && offset <= text.length;
+    function findHit(nearbyOnly) {
+      const matches = text.matchAll(/[A-Za-z]+(?:['’][A-Za-z]+)*(?:[-‐‑][A-Za-z]+(?:['’][A-Za-z]+)*)*/g);
+      for (const match of matches) {
+        const end = match.index + match[0].length;
+        if (nearbyOnly && match.index > offset + 1) break;
+        if (nearbyOnly && end < offset - 1) continue;
+        const rectRange = document.createRange();
+        rectRange.setStart(node, match.index);
+        rectRange.setEnd(node, end);
+        const anchorIndex = Array.from(rectRange.getClientRects()).findIndex(rect =>
+          x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+        );
+        if (anchorIndex >= 0) return completeSplitWord({ word: match[0].replace(/’/g, "'").replace(/[‐‑]/g, "-"), range: rectRange, node, start: match.index, end, anchorIndex });
+      }
+      return null;
     }
-    return null;
+    // Fall back to the original geometric search if a page reports an imprecise caret.
+    return hasOffset ? findHit(true) || findHit(false) : findHit(false);
+  }
+
+  function completeSplitWord(hit) {
+    if ((hit.start > 0 && hit.end < hit.node.textContent.length) ||
+        !document.createTreeWalker || !hit.node.parentElement) return hit;
+    const block = hit.node.parentElement.closest?.("p,li,blockquote,h1,h2,h3,h4,h5,h6") || hit.node.parentElement;
+    const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+    const pieces = [{ node: hit.node, start: hit.start, end: hit.end }];
+    let first = hit.node;
+    let last = hit.node;
+    let length = hit.end - hit.start;
+    for (let i = 0; i < 8 && pieces[0].start === 0 && length < 48; i++) {
+      walker.currentNode = first;
+      const previous = walker.previousNode();
+      if (previous?.parentElement?.closest?.("a,button,input,textarea,select,[contenteditable],[role=button],[role=link],code,pre")) break;
+      const text = previous?.textContent || "";
+      const tail = text.match(/[A-Za-z'’\-‐‑]+$/)?.[0];
+      if (!tail) break;
+      pieces.unshift({ node: previous, start: text.length - tail.length, end: text.length });
+      length += tail.length;
+      first = previous;
+    }
+    for (let i = 0; i < 8 && pieces[pieces.length - 1].end === (last.textContent || "").length && length < 48; i++) {
+      walker.currentNode = last;
+      const next = walker.nextNode();
+      if (next?.parentElement?.closest?.("a,button,input,textarea,select,[contenteditable],[role=button],[role=link],code,pre")) break;
+      const text = next?.textContent || "";
+      const head = text.match(/^[A-Za-z'’\-‐‑]+/)?.[0];
+      if (!head) break;
+      pieces.push({ node: next, start: 0, end: head.length });
+      length += head.length;
+      last = next;
+    }
+    if (pieces.length === 1 || length > 48) return hit;
+    const surface = pieces.map(piece => piece.node.textContent.slice(piece.start, piece.end)).join("");
+    if (!/^[A-Za-z]+(?:['’][A-Za-z]+)*(?:[-‐‑][A-Za-z]+(?:['’][A-Za-z]+)*)*$/.test(surface)) return hit;
+    const range = document.createRange();
+    range.setStart(pieces[0].node, pieces[0].start);
+    range.setEnd(pieces[pieces.length - 1].node, pieces[pieces.length - 1].end);
+    const rects = Array.from(range.getClientRects()).filter(rect => rect.width > 0 && rect.height > 0);
+    if (!rects.length || rects.some(rect => Math.abs(rect.top - rects[0].top) > 8 || Math.abs(rect.bottom - rects[0].bottom) > 8)) return hit;
+    const result = { ...hit, word: surface.replace(/’/g, "'").replace(/[‐‑]/g, "-"), range, anchorIndex: 0, splitNodes: true };
+    return result;
   }
 
   function clearSelected() {
@@ -411,10 +454,17 @@
     if (!selectedHit) return;
     const hit = selectedHit;
     const rects = Array.from(hit.range.getClientRects()).filter(rect => rect.width > 0 && rect.height > 0);
-    const original = hit.node.textContent.slice(hit.start, hit.end);
-    const canRound = rects.length === 1 && original && hit.node.parentElement && hit.node.isConnected;
+    const original = hit.splitNodes ? hit.range.toString() : hit.node.textContent.slice(hit.start, hit.end);
+    const bottomOf = rect => rect.bottom ?? rect.top + rect.height;
+    const rightOf = rect => rect.right ?? rect.left + rect.width;
+    const sameLine = rects.length > 0 && rects.every(rect =>
+      Math.abs(rect.top - rects[0].top) <= 8 && Math.abs(bottomOf(rect) - bottomOf(rects[0])) <= 8);
+    const canRound = sameLine && original && hit.node.parentElement && hit.node.isConnected;
     if (canRound) {
-      const rect = rects[0];
+      const rect = { left: Math.min(...rects.map(item => item.left)), top: Math.min(...rects.map(item => item.top)),
+        right: Math.max(...rects.map(rightOf)), bottom: Math.max(...rects.map(bottomOf)) };
+      rect.width = rect.right - rect.left;
+      rect.height = rect.bottom - rect.top;
       const font = getComputedStyle(hit.node.parentElement);
       if (!selectedChip) {
         selectedChip = document.createElement("span");
@@ -464,6 +514,15 @@
     return target;
   }
 
+  document.addEventListener("pointerover", event => {
+    if (warmupRequested || (event.pointerType && event.pointerType !== "mouse")) return;
+    if (!eligibleTarget(event)) return;
+    warmupRequested = true;
+    try {
+      chrome.runtime.sendMessage({ type: "warmup" }, () => { void chrome.runtime.lastError; });
+    } catch (_) { /* Waking the local worker is optional. */ }
+  }, true);
+
   document.addEventListener("scroll", scheduleSelectedPaint, true);
   window.addEventListener("resize", scheduleSelectedPaint);
   if (window.visualViewport) {
@@ -485,13 +544,10 @@
     if (hit) {
       syncSurfaceTheme(hit.node);
       selectWord(hit);
-      show(hit.word, sentenceContext(hit));
+      show(hit.word);
     }
   }, true);
 
-  sheet.addEventListener("click", event => {
-    if (!event.target.closest("button")) close();
-  });
   shadow.querySelector(".close").addEventListener("click", close);
   document.addEventListener("keydown", event => { if (event.key === "Escape") close(); });
   speaker.addEventListener("click", () => {
@@ -499,22 +555,10 @@
     stopPronunciation();
     const current = playbackId;
     setSpeakerState("playing");
-    let fallbackStarted = false;
-    const fallback = () => {
-      if (current !== playbackId || fallbackStarted) return;
-      fallbackStarted = true;
-      if (!("speechSynthesis" in window)) { setSpeakerState("error"); return; }
-      try {
-        const utterance = new SpeechSynthesisUtterance(activeWord);
-        utterance.lang = "en-US";
-        utterance.onend = () => { if (current === playbackId) setSpeakerState("idle"); };
-        utterance.onerror = () => { if (current === playbackId) setSpeakerState("error"); };
-        speechSynthesis.speak(utterance);
-      } catch (_) { setSpeakerState("error"); }
-    };
-    audio = new Audio("https://dict.youdao.com/dictvoice?audio=" + encodeURIComponent(activeWord) + "&type=0");
+    const failed = () => { if (current === playbackId) setSpeakerState("error"); };
+    audio = new Audio("https://dict.youdao.com/dictvoice?audio=" + encodeURIComponent(activeWord) + "&type=2");
     audio.onended = () => { if (current === playbackId) setSpeakerState("idle"); };
-    audio.onerror = fallback;
-    audio.play().catch(fallback);
+    audio.onerror = failed;
+    audio.play().catch(failed);
   });
 })();

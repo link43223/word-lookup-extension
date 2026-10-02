@@ -7,15 +7,31 @@
   <style>
     :root{color-scheme:light}
     *{box-sizing:border-box}
-    body{width:272px;margin:0;padding:20px 22px;background:#f8f7f3;color:#242424;font-family:Arial,"Microsoft YaHei",sans-serif}
+    body{width:300px;margin:0;padding:20px 22px;background:#f8f7f3;color:#242424;font-family:Arial,"Microsoft YaHei",sans-serif}
     .eyebrow{margin:0 0 9px;color:#80621f;font-size:11px;font-weight:700;letter-spacing:.12em}
     h1{margin:0 0 9px;font-size:20px;line-height:1.3}
     p{margin:0;color:#535353;font-size:14px;line-height:1.65}
+    .library{margin-top:16px;padding-top:14px;border-top:1px solid #dedbd2}
+    .summary{color:#242424;font-weight:700}
+    .status{min-height:22px;margin-top:2px;color:#6b6b68;font-size:12px}
+    .actions{display:flex;gap:8px;margin-top:10px}
+    button{flex:1;padding:8px 9px;border:1px solid #b79b59;border-radius:8px;background:#fffdf8;color:#6f5315;font:13px Arial,"Microsoft YaHei",sans-serif;cursor:pointer}
+    button:hover{background:#f1ead9}
+    input{display:none}
   </style>
 </head>
 <body>
   <p class="eyebrow">阅读辅助工具</p>
   <h1>点词即查</h1>
   <p>已开启。点击英文网页中的普通单词，即可查看音标、发音和中文释义。</p>
+  <section class="library" aria-label="个人词库">
+    <p class="summary">个人词库：<span id="library-count">—</span> 个词条</p>
+    <p class="status" id="backup-status">正在读取…</p>
+    <div class="actions">
+      <button id="manage-library" type="button">词库与备份</button>
+    </div>
+  </section>
+  <script src="library-ui.js"></script>
+  <script src="popup.js"></script>
 </body>
 </html>
